@@ -13,7 +13,11 @@ def main(args):
     experiment_directory = os.path.join('./exp_log', args.experiment_directory)
     specs = load_experiment_specifications(experiment_directory)
 
-    occ_dataset = dataloader.BSP_GTSamples(specs["DataSource"], test_flag=args.test_data, grid_sample=args.grid_sample)
+    occ_dataset = dataloader.dataset_from_specs(
+        specs,
+        test_flag=args.test_data,
+        grid_sample=int(args.grid_sample),
+    )
 
     data_loader = data_utils.DataLoader(
         occ_dataset,

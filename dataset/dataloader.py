@@ -1,57 +1,88 @@
-import numpy as np
+"""SECAD / SERCAD 数据集：``ae_train.hdf5``、``ae_test.hdf5`` 与 ``train_names.npz``、``test_names.npz``。"""
+
 import os
+from typing import Optional, Sequence
+
+import h5py
+import numpy as np
 import torch
 import torch.utils.data
-import h5py
 
-class BSP_GTSamples(torch.utils.data.Dataset):
+
+def _normalize_voxels(vox: torch.Tensor) -> torch.Tensor:
+    x = vox.float()
+    if x.dim() >= 5 and x.shape[-1] == 1:
+        x = x.squeeze(-1)
+    return x.unsqueeze(1)
+
+
+class GTSamples(torch.utils.data.Dataset):
+    """
+    与 SERCAD ``GTSamples`` 一致：HDF5 含 ``voxels``、``points_{grid_sample}``（末维为 xyz + 占用）。
+    """
+
     def __init__(
         self,
-        data_source,
-        grid_sample=64,
-        test_flag=False,
-        shapenet_flag = False,
-        cat = ''
+        data_source: str,
+        grid_sample: int = 64,
+        test_flag: bool = False,
+        name_keys: Optional[Sequence[str]] = None,
     ):
-        print('data source', data_source)
+        print("data source", data_source)
         self.data_source = data_source
-        cat = data_source.split('/')[-1].split('_')[0]
+
         if test_flag:
-            filename_shapes = os.path.join(self.data_source, cat + '_vox256_img_test.hdf5')
-            name_file = os.path.join(self.data_source, cat + '_vox256_img_test.txt')
-            npz_shapes = np.genfromtxt(name_file, dtype='str', delimiter='\n')
-            self.data_names = npz_shapes
+            h5_path = os.path.join(data_source, "ae_test.hdf5")
+            npz_path = os.path.join(data_source, "test_names.npz")
+            keys = list(name_keys) if name_keys else ("test_names",)
         else:
-            filename_shapes = os.path.join(self.data_source, cat + '_vox256_img_train.hdf5')
-            name_file = os.path.join(self.data_source, cat + '_vox256_img_train.txt')
-            npz_shapes = np.genfromtxt(name_file, dtype='str', delimiter='\n')
-            self.data_names = npz_shapes
+            h5_path = os.path.join(data_source, "ae_train.hdf5")
+            npz_path = os.path.join(data_source, "train_names.npz")
+            keys = list(name_keys) if name_keys else ("train_names",)
 
-        data_dict = h5py.File(filename_shapes, 'r')
-        print(data_dict.keys())
-        print('grid_sample',grid_sample)
+        npz = np.load(npz_path)
+        self.data_names = None
+        for k in keys:
+            if k in npz.files:
+                self.data_names = npz[k]
+                break
+        if self.data_names is None:
+            raise KeyError(
+                f"No name array in {npz_path}; tried {keys}; files={npz.files}"
+            )
 
-        data_voxels = torch.from_numpy(data_dict['voxels'][:]).float()
-        self.data_voxels = data_voxels.squeeze(-1).unsqueeze(1)
-        data_points = torch.from_numpy(data_dict['points_'+str(grid_sample)][:]).float()
-        data_values = torch.from_numpy(data_dict['values_'+str(grid_sample)][:]).float()
+        pk = "points_" + str(grid_sample)
+        with h5py.File(h5_path, "r") as f:
+            print(sorted(f.keys()))
+            print("grid_sample", grid_sample)
+            if "voxels" not in f:
+                raise KeyError(f"Missing voxels in {h5_path}")
+            if pk not in f:
+                raise KeyError(f"Missing {pk} in {h5_path}")
+            data_voxels = torch.from_numpy(f["voxels"][:])
+            self.data_points = torch.from_numpy(f[pk][:]).float()
 
-        if data_values.dim() < data_points.dim():
-            data_values = data_values.unsqueeze(-1)
-            data_points[torch.isnan(data_points)] = 0
-            data_values[torch.isnan(data_values)] = 0
-            self.data_points = torch.cat([data_points, data_values], 2)
-            perm = torch.randperm(self.data_points.size(1))
-            self.data_points = self.data_points[:, perm, :]
-        else:
-            data_points = (data_points+0.5)/256-0.5
-            self.data_points = torch.cat([data_points, data_values], 2)
+        self.data_voxels = _normalize_voxels(data_voxels)
+        print("Loaded voxels shape, ", self.data_voxels.shape)
+        print("Loaded points shape, ", self.data_points.shape)
 
-        print('Loaded voxels shape, ', self.data_voxels.shape)
-        print('Loaded points shape, ', self.data_points.shape)
-
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.data_voxels)
 
-    def __getitem__(self, idx):
-        return {"voxels":self.data_voxels[idx], "occ_data":self.data_points[idx]}
+    def __getitem__(self, idx: int):
+        return {"voxels": self.data_voxels[idx], "occ_data": self.data_points[idx]}
+
+
+def dataset_from_specs(
+    specs: dict,
+    test_flag: bool = False,
+    grid_sample: int = 64,
+) -> GTSamples:
+    """``specs`` 可选 ``DatasetNameKeys``：npz 内名称数组的键名列表。"""
+    name_keys = specs.get("DatasetNameKeys")
+    return GTSamples(
+        specs["DataSource"],
+        grid_sample=grid_sample,
+        test_flag=test_flag,
+        name_keys=name_keys,
+    )

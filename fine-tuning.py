@@ -11,7 +11,11 @@ def main(args):
     init_seeds(42)
     experiment_directory = os.path.join('./exp_log', args.experiment_directory)
     specs = load_experiment_specifications(experiment_directory)
-    occ_dataset = dataloader.BSP_GTSamples(specs["DataSource"], grid_sample=args.grid_sample, test_flag=True)
+    occ_dataset = dataloader.dataset_from_specs(
+        specs,
+        test_flag=True,
+        grid_sample=int(args.grid_sample),
+    )
 
     shape_indexes = list(range(int(args.start_index), int(args.end_index)))
     print('Indices of shapes that need fine-tuning: ', shape_indexes)

@@ -10,7 +10,7 @@ import torch.nn.functional as F
 def main(args):
 	experiment_directory = os.path.join('./exp_log', args.experiment_directory)
 	specs = load_experiment_specifications(experiment_directory)
-	occ_dataset = dataloader.BSP_GTSamples(specs["DataSource"], test_flag=True)	
+	occ_dataset = dataloader.dataset_from_specs(specs, test_flag=True)
 	reconstruction_dir = os.path.join(experiment_directory, "Reconstructions")
 	
 	if not os.path.isdir(reconstruction_dir):
