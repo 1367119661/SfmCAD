@@ -18,3 +18,12 @@ Reconstructions/
 *.pkl
 *.ply
 *.obj
+*.
+
+# OS
+.DS_Store
+Thumbs.db
+# macOS AppleDouble / resource fork sidecar files (e.g. ._filename)
+._*
+# Project: experiment logs
+exp_log/
