@@ -229,7 +229,7 @@ def create_mesh_mc(generator, shape_3d, shape_code, filename, N=128, max_batch=3
     if not os.path.exists(os.path.dirname(mesh_filename)):
         os.makedirs(os.path.dirname(mesh_filename))
 
-    utils.save_ply_data(f"{mesh_filename}.ply", mesh_points, faces)
+    utils.save_obj_data(f"{mesh_filename}.obj", mesh_points, faces)
 
 def create_CAD_mesh(generator, shape_code, shape_3d, CAD_mesh_filepath):
     """
